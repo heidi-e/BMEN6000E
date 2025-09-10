@@ -3,6 +3,10 @@ Thermistors
 BMEN 6000 - Signal Processing for Medical Devices 2025
  **************************************************************************/
 
+// Heidi Eren
+// Lab 1 Arduino code
+
+
 // Fill in variable values correctly: 5 pts
 // Required libraries
 
@@ -36,8 +40,8 @@ float temp;
 
 // Moving average variables
 
-int i;
-const int buffsize = 1;
+int i = 0;
+const int buffsize = 20;
 float tempBuff[buffsize];
 float sumTemp = 0;
 float avgTemp;
@@ -54,7 +58,7 @@ void setup() {
   Serial.begin(9600);
   while (!Serial);
 
-//Uncomment to use SD card
+// Load data onto SD card as txt file
 
 SD.begin(chipSelect);
 if (!SD.begin(chipSelect)) {
@@ -98,15 +102,19 @@ void loop() {
 
   // Calculate temperature from resistance
   // 10 pts
-
-  temp = 1/(SHa + SHb * log(resistance) + SHc*(pow(log(resistance),3)));
-
+  logR = log(resistance)
+  temp = 1/(SHa + SHb * logR + SHc*(pow(logR,3)));
 
   // Moving average
   // 10 pts
-  // select time window and calculate average of that time window
-  // buff size is the specific window size
+  sumTemp -= tempBuff[i];    //remove previous temp sample
+  tempBuffer[i] = temp;    //replace with new temp sample
+  sumTemp += tempBuff[i];    //compute sum of temp list
 
+  i++;
+
+  if (i >= buffsize) i = 0;    //make sure the buffsize is not exceeded
+  avgTemp = sumTemp / buffsize;    //update avg temp for new temp sample
 
   // Output (Serial.print prints to the serial monitor; tempRecord.print prints to the SD card)
 
@@ -146,8 +154,8 @@ void loop() {
   }
   
   // Implement sampling rate: 5 pts
-
-  delay(100);
+  // sample rate = 256 ms → ~3.9 Hz sampling rate
+  delay(sampRate);
 
 }
 
