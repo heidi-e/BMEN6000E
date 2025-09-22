@@ -17,31 +17,31 @@ BMEN 6000 - Signal Processing for Medical Devices 2025
 
 // Input parameters
 
-float R1 = 10;
-float R2 = 10;
-float R3 = 10;
+float R1 = 10000;
+float R2 = 10000;
+float R3 = 10000;
 float inVoltage = 3.3;
 float sampRate = 256;
 
 // DAQ variables
 
-int V1;
-int V2;
+float V1;
+float V2;
 
 // Temp calculation variables
 
 float Vdiff;
 float resistance;
 float logR;
-float SHa = 1e-3;
-float SHb = 1e-5;
-float SHc = 1e-6;
+float SHa = 0.00242954349576175;
+float SHb = 0.0000107263530098312;
+float SHc = 9.31866759185675E-07;
 float temp;
 
 // Moving average variables
 
 int i = 0;
-const int buffsize = 20;
+const int buffsize = 10;
 float tempBuff[buffsize];
 float sumTemp = 0;
 float avgTemp;
@@ -92,28 +92,31 @@ void loop() {
   // Calculate difference between nodes (equivalent to voltage across bridge)
   // 3 pts
 
-  Vdiff = V1 - V2;
+  V1 = (V1 * 3.3) / 1023;   //convert bits to voltage
+  V2 = (V2 * 3.3) / 1023;
+  Vdiff = V2 - V1;
 
 
   // Calculate resistance from voltage
   // 7 pts
-  resistance = ((R2 * inVoltage - (R1 + R2) * Vdiff) / (R1 * inVoltage + (R1 + R2))* Vdiff) * R3;
+  resistance = (((R2 * inVoltage - (R1 + R2) * Vdiff) / (R1 * inVoltage + (R1 + R2)* Vdiff))) * R3;
 
 
   // Calculate temperature from resistance
   // 10 pts
-  logR = log(resistance)
-  temp = 1/(SHa + SHb * logR + SHc*(pow(logR,3)));
+  logR = log(resistance);
+  temp = (1/(SHa + SHb * logR + SHc*pow(logR,3))) - 273.15;
 
   // Moving average
   // 10 pts
   sumTemp -= tempBuff[i];    //remove previous temp sample
-  tempBuffer[i] = temp;    //replace with new temp sample
+  tempBuff[i] = temp;    //replace with new temp sample
   sumTemp += tempBuff[i];    //compute sum of temp list
 
   i++;
+  
 
-  if (i >= buffsize) i = 0;    //make sure the buffsize is not exceeded
+  if (i >= buffsize) {i = 0;}    //make sure the buffsize is not exceeded
   avgTemp = sumTemp / buffsize;    //update avg temp for new temp sample
 
   // Output (Serial.print prints to the serial monitor; tempRecord.print prints to the SD card)
@@ -129,6 +132,7 @@ void loop() {
   Serial.print(temp);
   Serial.print("\t");
   Serial.println(avgTemp);
+  
 
   // Uncomment to use SD card
   
@@ -148,14 +152,14 @@ void loop() {
     tempRecord.println(avgTemp);
     tempRecord.close();
   }
-  else {
-    Serial.println("error opening tempLog.txt");
-    return;
-  }
+  // else {
+  //   Serial.println("error opening tempLog.txt");
+  //   return;
+  // }
   
   // Implement sampling rate: 5 pts
   // sample rate = 256 ms → ~3.9 Hz sampling rate
-  delay(sampRate);
+  delay(1000);
 
 }
 
