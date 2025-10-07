@@ -40,6 +40,14 @@ double vImag[samples];
 float samplingFrequency = 25; 
 float irnoDC;
 
+
+// extra variables
+float irRemoveDC[256];  // DC-removed IR signal
+float autocorr[256];    // Autocorrelation result
+float freq;
+float sum;
+
+
 ArduinoFFT<double> FFT = ArduinoFFT<double>(vReal, vImag, samples, samplingFrequency);
 
 #define SCL_INDEX 0x00
@@ -51,12 +59,12 @@ float peakloc;
 float currIR;
 float diffIR[256];
 float myHR;
-const int buffsize = ;
+const int buffsize = 8;
 float HRBuff[buffsize];
-float sumHR;
+float sumHR = 0;
 float irDC;
 float myavgHR;
-int j;
+int j = 0;
 
 void setup() {
 
@@ -135,12 +143,24 @@ void loop() {
   maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
   
   // Remove DC component (2 pts)
+  sum = 0;
+  for (int i = 0; i < samples; i++) {
+      
+      // compute sum of IR signal
+      sum  += irBuffer[i];
+  }
 
-  irnoDC = ;
+  // compute DC (take the average of IR)
+  irDC  = sum  / samples;
+
+
 
  //double ratio = twoPi * signalFrequency / samplingFrequency; // Fraction of a complete cycle stored at each sample (in radians)
   for (uint16_t i = 0; i < samples; i++)
   {
+    //remove DC component
+    irnoDC = irBuffer[i] - irDC;
+
     vReal[i] = irnoDC;/* Build data with positive and negative values*/
     //vReal[i] = uint8_t((amplitude * (sin(i * ratio) + 1.0)) / 2.0);/* Build data displaced on the Y axis to include only positive values*/
     vImag[i] = 0.0; //Imaginary part must be zeroed in case of looping to avoid wrong calculations and overflows
@@ -148,15 +168,44 @@ void loop() {
   FFT.windowing(FFTWindow::Hamming, FFTDirection::Forward);	/* Weigh data */
   FFT.compute(FFTDirection::Forward); /* Compute FFT */
   FFT.complexToMagnitude(); /* Compute magnitudes */
-  //PrintVector(vReal, samples>>1, SCL_PLOT); // Will print magnitude of all peaks
+  PrintVector(vReal, samples>>1, SCL_PLOT); // Will print magnitude of all peaks
   
+
+  // given magnitude of all frequencies from printVector
   // Find index of maximum peak (3 pts)
+  peakloc = 1;
+  peak = vReal[peakloc];
+  for (int i = 1; i < (samples>>1); i++) {
+    if (vReal[i] > peak)
+    {
+      peak = vReal[i];
+      peakloc = i;
+
+    }
+  }
+
 
   // Convert index of max peak to frequency (2 pts)
+  // sample rate = sampling freq / number of samples 
+  // peakloc = num of samples 
+  // frequency = 1/period = 1/(num of samples / sample rate) = sample rate / peakloc
+  freq = peakloc * (samplingFrequency / samples);
+
 
   // Convert frequency to HR (2 pts)
+  // HR = beats per min
+  // HR = 60 * beats/sec = 60 * freq
+  myHR = 60 * freq;
 
   // Calculate moving average HR (1 pt)
+  sumHR -= HRBuff[j];  // remove previous sample
+  HRBuff[j] = myHR;   // replace with new HR
+  sumHR += HRBuff[j]; //compute sum of HR
+
+  j++;
+  if (j >= buffsize) {j = 0;}  //make sure the buffsize is not exceeded
+  myavgHR = sumHR / buffsize;  // update avgHR with new sample
+
 
     
     // Serial.print(spo2, DEC);

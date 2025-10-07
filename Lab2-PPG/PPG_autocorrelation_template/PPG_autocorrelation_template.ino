@@ -142,7 +142,7 @@ void loop() {
   // Calculate HR and SpO2 using existing library
   maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
   
-
+  // if i wanted to find the autocorrelation with the deriative, change irBuffer to diffIR
   // Remove DC component (2 pts)
   sum = 0;
   for (int i = 0; i < samples; i++) {
@@ -152,7 +152,7 @@ void loop() {
   }
 
   // compute DC (take the average of IR)
-  irDC  = sumIR  / samples;
+  irDC  = sum  / samples;
 
   // remove DC component from signal
   for (int i = 0; i < samples; i++) {
@@ -177,22 +177,25 @@ void loop() {
   
   // ensure lag=0 is skipped since it is the max
   peakloc = 1;
-  maxAutocorr = autocorr[peakloc];
+  peak = autocorr[peakloc];
 
   // start with min lag
-  int minLag = 30;  // Corresponds to ~400 bpm (200 samples/sec)
+  int minLag = 30;  // Corresponds to ~400 bpm (30 samples/sec)
   int maxLag = 200; // Corresponds to ~60 bpm (200 samples/sec)
   
-  // loop to find the max lag
+  // loop to find the max lag and store as peakloc
   for (int lag = minLag; lag < maxLag && lag < samples; lag++) {
-      if (autocorr[lag] > maxAutocorr) {
-          maxAutocorr = autocorr[lag];
+      if (autocorr[lag] > peak) {
+          peak = autocorr[lag];
           peakloc = lag;
       }
   }
 
 
   // Convert index of max value to HR (4 pts)
+  // HR = beats per min
+  // HR = 60 * beats/sec = 60 * freq
+  // frequency = 1/period = 1/(num of samples / sample rate) = sample rate / peakloc
   myHR = 60.0 * sampleRate / peakloc;
 
   // Calculate moving average HR (1 pt)
@@ -204,6 +207,7 @@ void loop() {
   if (j >= buffsize) {j = 0;}  //make sure the buffsize is not exceeded
   myavgHR = sumHR / buffsize;  // update avgHR with new sample
 
+  
 
 
     // Serial.print(spo2, DEC);
