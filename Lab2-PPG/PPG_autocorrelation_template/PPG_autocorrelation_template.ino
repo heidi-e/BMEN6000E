@@ -46,11 +46,19 @@ float peakloc;
 float currIR;
 float diffIR[256];
 float myHR;
-const int buffsize = ;
+const int buffsize = 8;  //can be changed
 float HRBuff[buffsize];
 float sumHR;
 float myavgHR;
 int j;
+
+
+// extra variables for autocorrelation
+float irRemoveDC[256];  // DC-removed IR signal
+float autocorr[256];    // Autocorrelation result
+
+
+
 
 void setup() {
 
@@ -122,9 +130,11 @@ void loop() {
 
       redBuffer[i] = PPGSensor.getRed();
       irBuffer[i] = PPGSensor.getIR();
-      float prevIR = ;
-      currIR =;
-      diffIR[i] = ;
+      // Calculate the derivative for event detection
+      float prevIR = irBuffer[i-1];
+      currIR = irBuffer[i];
+      diffIR[i] = (currIR - prevIR) * sampleRate;
+
 
       PPGSensor.nextSample(); //We're finished with this sample so move to next sample
     }
@@ -132,16 +142,69 @@ void loop() {
   // Calculate HR and SpO2 using existing library
   maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
   
+
   // Remove DC component (2 pts)
+  sum = 0;
+  for (int i = 0; i < samples; i++) {
+      
+      // compute sum of IR signal
+      sum  += irBuffer[i];
+  }
+
+  // compute DC (take the average of IR)
+  irDC  = sumIR  / samples;
+
+  // remove DC component from signal
+  for (int i = 0; i < samples; i++) {
+      irRemoveDC[i] = irBuffer[i] - irDC;
+  }
+
 
   // Calculate autocorrelation (4 pts)
 
+  // signal to itself shifted by lag
+  // autocorr[lag] = sum(signal[i] * signal[i+lag])
+  for (int lag = 0; lag < samples; lag++) {
+      autocorr[lag] = 0;
+      for (int i = 0; i < samples - lag; i++) {
+          autocorr[lag] += irRemoveDC[i] * irRemoveDC[i + lag];
+      }
+  }
+
+
+
   // Find index of maximum value (3 pts)
+  
+  // ensure lag=0 is skipped since it is the max
+  peakloc = 1;
+  maxAutocorr = autocorr[peakloc];
+
+  // start with min lag
+  int minLag = 30;  // Corresponds to ~400 bpm (200 samples/sec)
+  int maxLag = 200; // Corresponds to ~60 bpm (200 samples/sec)
+  
+  // loop to find the max lag
+  for (int lag = minLag; lag < maxLag && lag < samples; lag++) {
+      if (autocorr[lag] > maxAutocorr) {
+          maxAutocorr = autocorr[lag];
+          peakloc = lag;
+      }
+  }
+
 
   // Convert index of max value to HR (4 pts)
+  myHR = 60.0 * sampleRate / peakloc;
 
   // Calculate moving average HR (1 pt)
- 
+  sumHR -= HRBuff[j];  // remove previous sample
+  HRBuff[j] = myHR;   // replace with new HR
+  sumHR += HRBuff[j]; //compute sum of HR
+
+  j++;
+  if (j >= buffsize) {j = 0;}  //make sure the buffsize is not exceeded
+  myavgHR = sumHR / buffsize;  // update avgHR with new sample
+
+
 
     // Serial.print(spo2, DEC);
     // Serial.print("\t");

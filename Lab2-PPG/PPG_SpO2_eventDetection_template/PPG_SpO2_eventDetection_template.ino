@@ -54,8 +54,8 @@ float currIR;
 float diffIR[200];
 byte isPos = 0;
 byte prevPos = 0;
-float diffThresh = 1500;
-float IRthresh = 50000;
+float diffThresh = 1500;  //CAN BE CHANGED
+float IRthresh = 50000;   //CAN BE CHANGED
 int beatDetected;
 float beatTime;
 float prevBeatTime =0;
@@ -63,18 +63,19 @@ float timeBetweenBeats;
 float myHR;
 const int buffsize = 8;
 float HRBuff[buffsize];
-float sumHR;
+float sumHR = 0;
 float myavgHR;
-int j;
+int j = 0;
 
-// Variables for HRV calculation
+// Variables to calculate HRV
 float IBIavg;
 float IBI;
-float sumVar;
+float sumVar = 0;
+float sumIBI = 0;
 float variance;
 float HRV;
 
-const int IBIbuffsize = 8;
+const int IBIbuffsize = 8;  //CAN BE CHANGED
 float IBIBuff[IBIbuffsize];
 int ibiIndex = 0;
 
@@ -183,7 +184,7 @@ void loop() {
     maxIR  = irBuffer[0];
     minIR  = irBuffer[0];
 
-    for (int i = 1; i < bufferLength; i++) {
+    for (int i = 0; i < bufferLength; i++) {
         
         // compute sums of red and IR signal
         sumRed += redBuffer[i];
@@ -194,30 +195,34 @@ void loop() {
         if (redBuffer[i] < minRed) minRed = redBuffer[i];
         if (irBuffer[i]  > maxIR)  maxIR  = irBuffer[i];
         if (irBuffer[i]  < minIR)  minIR  = irBuffer[i];
+
+    }
     
-        // copmute DC (take the average of red and of IR)
-        redDC = sumRed / bufferLength;
-        irDC  = sumIR  / bufferLength;
+    // copmute DC (take the average of red and of IR)
+    redDC = sumRed / bufferLength;
+    irDC  = sumIR  / bufferLength;
 
-        
-        // compute AC (amplitude of wave)
-        redAC = (maxRed - minRed) / 2.0;  
-        irAC  = (maxIR - minIR) / 2.0;
+    
+    // compute AC (amplitude of wave)
+    redAC = (maxRed - minRed) / 2.0;  
+    irAC  = (maxIR - minIR) / 2.0;
 
-        // compute R (ratio of normalized amplitudes between red and IR channels)
-        R = ((redAC / redDC) / (irAC / irDC));
-        mySpO2 = 110 - 25 * R;
+    // compute R (ratio of normalized amplitudes between red and IR channels)
+    R = ((redAC / redDC) / (irAC / irDC));
+    mySpO2 = 110 - 25 * R;
     
 
     // Calculate HR manually using event detection //HR detection uses the IR component (5 pts)
-    
+    for (int i = 1; i < bufferLength; i++) {
     prevPos = isPos;
     // comparision expression
     // true (1) --> slope is positive
     // false (0) --> slope is negative
     isPos = (diffIR[i] > diffThresh);  // true if slope is rising
 
-    // for peak detection - slope switched from pos to neg and above IR threshold
+    // peak detection 
+    // find peak (zero crossing) slope crosses from pos to neg
+    // signal must be above IR threshold
     if (prevPos == 1 && isPos == 0 && irBuffer[i] > IRthresh) {
         beatDetected++;
         beatTime = millis();
@@ -226,58 +231,54 @@ void loop() {
         if (timeBetweenBeats > 300 && timeBetweenBeats < 2000) { 
             // ignore out of range intervals (<30 bpm or >200 bpm)
             myHR = 60000.0 / timeBetweenBeats; // bpm
-
+            
             // keep last 8 HR values
-            HRBuff[j % buffsize] = myHR;
-            j++;
+            // HRBuff[j % buffsize] = myHR;
+            // j++;
+            // sumHR = 0;
+            // for (int k = 0; k < min(j, buffsize); k++) {
+            //     sumHR += HRBuff[k];
+            // }
+            // myavgHR = sumHR / min(j, buffsize);
 
-            // compute moving average of HR
-            sumHR = 0;
-            for (int k = 0; k < min(j, buffsize); k++) {
-                sumHR += HRBuff[k];
+            // Calculate moving average of HR (1 pt)
+            sumHR -= HRBuff[j];  // remove previous sample
+            HRBuff[j] = myHR;   // replace with new HR
+            sumHR += HRBuff[j]; //compute sum of HR
+
+            j++;
+            if (j >= buffsize) {j = 0;}  //make sure the buffsize is not exceeded
+            myavgHR = sumHR / buffsize;  // update avgHR with new sample
+          
+
+            // Calculate HRV manually (5pts (BONUS))
+            IBI = beatTime - prevBeatTime;   // ms between beats
+
+            // compute moving average of HRV
+            sumIBI -= IBIBuff[ibiIndex];  // remove previous sample
+            IBIBuff[ibiIndex] = IBI;   // replace with new IBI
+            sumIBI += IBIBuff[ibiIndex]; //compute sum of IBI
+
+            ibiIndex++;
+            if (ibiIndex >= IBIbuffsize) {ibiIndex = 0;}  //make sure the buffsize is not exceeded
+            IBIavg = sumIBI / IBIbuffsize;  // update avgIBI with new sample
+
+
+
+            //HRV as SSN (squared standard deviation of IBI = variance)
+            sumVar = 0;
+            for (int k = 0; k < IBIbuffsize; k++) {
+                  sumVar += pow(IBIBuff[k] - IBIavg, 2);
             }
-            myavgHR = sumHR / min(j, buffsize);
+            variance = sumVar / IBIbuffsize;
+            HRV = sqrt(variance);
+
         }
 
-        prevBeatTime = beatTime;
+        prevBeatTime = beatTime;  //can be moved to inside for loop above (300<timebeats<2000)
+      }
+
     }
-
-
-
-    // Calculate HRV manually (5pts (BONUS))
-    IBI = beatTime - prevBeatTime;   // ms between beats
-    IBIBuff[ibiIndex % IBIbuffsize] = IBI;
-    ibiIndex++;
-
-    sumVar = 0;
-    for (int k = 0; k < min(ibiIndex, IBIbuffsize); k++) {
-        sumVar += IBIBuff[k];
-    }
-    IBIavg = sumVar / min(ibiIndex, IBIbuffsize);
-
-    //HRV as SSN
-    // variance
-    sumVar = 0;
-    for (int k = 0; k < min(ibiIndex, IBIbuffsize); k++) {
-        sumVar += pow(IBIBuff[k] - IBIavg, 2);
-    }
-    variance = sumVar / min(ibiIndex, IBIbuffsize);
-
-    // HRV = standard deviation of IBI
-    HRV = sqrt(variance);
-    
-    // HRV as RMSSD
-
-    // float sumSqDiff = 0;
-    // for (int k = 1; k < min(ibiIndex, IBIbuffsize); k++) {
-    //     float diff = IBIBuff[k] - IBIBuff[k-1];
-    //     sumSqDiff += diff * diff;
-    // }
-    // HRV = sqrt(sumSqDiff / (min(ibiIndex, IBIbuffsize)-1));
-
-
-    // Calculate moving average of HR (1 pt)
-
     
     Serial.print(spo2, DEC);
     Serial.print("\t");
