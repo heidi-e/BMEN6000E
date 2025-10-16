@@ -37,7 +37,7 @@ int8_t validHeartRate; //indicator to show if the heart rate calculation is vali
 const uint16_t samples = 256; //This value MUST ALWAYS be a power of 2
 double vReal[samples];
 double vImag[samples];
-float samplingFrequency = 25; 
+float samplingFrequency = 256; 
 float irnoDC;
 
 
@@ -143,6 +143,7 @@ void loop() {
   maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
   
   // Remove DC component (2 pts)
+  // use moving average for greater accuracy
   sum = 0;
   for (int i = 0; i < samples; i++) {
       
@@ -168,13 +169,13 @@ void loop() {
   FFT.windowing(FFTWindow::Hamming, FFTDirection::Forward);	/* Weigh data */
   FFT.compute(FFTDirection::Forward); /* Compute FFT */
   FFT.complexToMagnitude(); /* Compute magnitudes */
-  PrintVector(vReal, samples>>1, SCL_PLOT); // Will print magnitude of all peaks
+  //PrintVector(vReal, samples>>1, SCL_PLOT); // Will print magnitude of all peaks
   
 
   // given magnitude of all frequencies from printVector
   // Find index of maximum peak (3 pts)
   peakloc = 1;
-  peak = vReal[peakloc];
+  peak = vReal[1];
   for (int i = 1; i < (samples>>1); i++) {
     if (vReal[i] > peak)
     {
@@ -235,33 +236,33 @@ void loop() {
     
 }
 
-void PrintVector(double *vData, uint16_t bufferSize, uint8_t scaleType)
-{
-  for (uint16_t i = 0; i < bufferSize; i++)
-  {
-    double abscissa;
-    /* Print abscissa value */
-    switch (scaleType)
-    {
-      case SCL_INDEX:
-        abscissa = (i * 1.0);
-	      break;
-      case SCL_TIME:
-        abscissa = ((i * 1.0) / samplingFrequency);
-        break;
-      case SCL_FREQUENCY:
-        abscissa = ((i * 1.0 * samplingFrequency) / samples);
-	      break;
-    }
-    if(scaleType!=SCL_PLOT)
-    {
-      Serial.print(abscissa, 6);
-      if(scaleType==SCL_FREQUENCY)
-        Serial.print("Hz");
-      Serial.print(" ");
-    }
-    Serial.println(vData[i], 4);
-  }
-  Serial.println();
-}
+// void PrintVector(double *vData, uint16_t bufferSize, uint8_t scaleType)
+// {
+//   for (uint16_t i = 0; i < bufferSize; i++)
+//   {
+//     double abscissa;
+//     /* Print abscissa value */
+//     switch (scaleType)
+//     {
+//       case SCL_INDEX:
+//         abscissa = (i * 1.0);
+// 	      break;
+//       case SCL_TIME:
+//         abscissa = ((i * 1.0) / samplingFrequency);
+//         break;
+//       case SCL_FREQUENCY:
+//         abscissa = ((i * 1.0 * samplingFrequency) / samples);
+// 	      break;
+//     }
+//     if(scaleType!=SCL_PLOT)
+//     {
+//       Serial.print(abscissa, 6);
+//       if(scaleType==SCL_FREQUENCY)
+//         Serial.print("Hz");
+//       Serial.print(" ");
+//     }
+//     Serial.println(vData[i], 4);
+//   }
+//   Serial.println();
+// }
 

@@ -54,18 +54,20 @@ float currIR;
 float diffIR[200];
 byte isPos = 0;
 byte prevPos = 0;
-float diffThresh = 1500;  //CAN BE CHANGED
-float IRthresh = 50000;   //CAN BE CHANGED
-int beatDetected;
-float beatTime;
-float prevBeatTime =0;
+float diffThresh = 50;  //CAN BE CHANGED
+float IRthresh = 220000;   //CAN BE CHANGED
+int beatDetected = 0;
+unsigned long beatTime;
+unsigned long prevBeatTime = 0;
 float timeBetweenBeats;
 float myHR;
-const int buffsize = 8;
+const int buffsize = 10;
 float HRBuff[buffsize];
 float sumHR = 0;
 float myavgHR;
 int j = 0;
+int numBeats = 0;
+
 
 // Variables to calculate HRV
 float IBIavg;
@@ -155,7 +157,7 @@ void loop() {
       // Calculate the derivative for event detection
       float prevIR = irBuffer[i-1];
       currIR = irBuffer[i];
-      diffIR[i] = (currIR - prevIR) * sampleRate;
+      diffIR[i] = (currIR - prevIR);
 
     
       PPGSensor.nextSample(); //We're finished with this sample so move to next sample
@@ -215,31 +217,42 @@ void loop() {
     // Calculate HR manually using event detection //HR detection uses the IR component (5 pts)
     for (int i = 1; i < bufferLength; i++) {
     prevPos = isPos;
-    // comparision expression
+
+    // take the derivative
     // true (1) --> slope is positive
     // false (0) --> slope is negative
     isPos = (diffIR[i] > diffThresh);  // true if slope is rising
+    
+    // Serial.print(diffIR[i]);
+    // Serial.print("\t");
+    // Serial.print(isPos);
+    // Serial.println("\t");
+    // Serial.print(irBuffer[i]);
+    // Serial.print("\t");
+    // Serial.println(diffIR[i]);
 
     // peak detection 
     // find peak (zero crossing) slope crosses from pos to neg
     // signal must be above IR threshold
     if (prevPos == 1 && isPos == 0 && irBuffer[i] > IRthresh) {
         beatDetected++;
-        beatTime = millis();
-        timeBetweenBeats = beatTime - prevBeatTime;
 
-        if (timeBetweenBeats > 300 && timeBetweenBeats < 2000) { 
+        // in milliseconds
+        
+        //beatTime = i * (1000.0 / sampleRate);
+        //beatTime = millis();
+        unsigned long now = micros() / 100000; // ms
+        
+        if (beatDetected > 1 && now - prevBeatTime > 250) {
+          unsigned long beatTime = now;
+          timeBetweenBeats = beatTime - prevBeatTime;
+          //Serial.print("IBI = ");
+          //Serial.println(timeBetweenBeats);
+        //if (timeBetweenBeats > 100 && timeBetweenBeats < 2000) { 
             // ignore out of range intervals (<30 bpm or >200 bpm)
             myHR = 60000.0 / timeBetweenBeats; // bpm
-            
-            // keep last 8 HR values
-            // HRBuff[j % buffsize] = myHR;
-            // j++;
-            // sumHR = 0;
-            // for (int k = 0; k < min(j, buffsize); k++) {
-            //     sumHR += HRBuff[k];
-            // }
-            // myavgHR = sumHR / min(j, buffsize);
+            //Serial.print("HR = ");
+            //Serial.println(myHR);
 
             // Calculate moving average of HR (1 pt)
             sumHR -= HRBuff[j];  // remove previous sample
@@ -248,8 +261,14 @@ void loop() {
 
             j++;
             if (j >= buffsize) {j = 0;}  //make sure the buffsize is not exceeded
-            myavgHR = sumHR / buffsize;  // update avgHR with new sample
-          
+            // only divide by the number of valid beats recorded so far
+            if (numBeats < buffsize) numBeats++;
+            myavgHR = sumHR / numBeats;
+            //myavgHR = sumHR / buffsize;  // update avgHR with new sample
+            // compute moving average using number of samples actually collected
+            //int count = min(beatDetected, buffsize);  
+            //myavgHR = sumHR / count;
+
 
             // Calculate HRV manually (5pts (BONUS))
             IBI = beatTime - prevBeatTime;   // ms between beats
@@ -272,12 +291,13 @@ void loop() {
             }
             variance = sumVar / IBIbuffsize;
             HRV = sqrt(variance);
+          //prevBeatTime = beatTime;  //can be moved to inside for loop above (300<timebeats<2000)
+       //}
 
         }
-
-        prevBeatTime = beatTime;  //can be moved to inside for loop above (300<timebeats<2000)
-      }
-
+    }
+    prevBeatTime = beatTime;
+    
     }
     
     Serial.print(spo2, DEC);
@@ -290,7 +310,8 @@ void loop() {
     Serial.print("\t");
     Serial.print(HRV, 0);
     Serial.println("\t");
-
+  
+  
   // pulseRecord = SD.open("HRLog.txt", FILE_WRITE);
   
   // if (pulseRecord) {
@@ -313,4 +334,3 @@ void loop() {
   }
   
   
-}

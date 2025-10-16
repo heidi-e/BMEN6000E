@@ -174,14 +174,16 @@ void loop() {
 
 
   // Find index of maximum value (3 pts)
-  
-  // ensure lag=0 is skipped since it is the max
-  peakloc = 1;
-  peak = autocorr[peakloc];
+
 
   // start with min lag
-  int minLag = 30;  // Corresponds to ~400 bpm (30 samples/sec)
-  int maxLag = 200; // Corresponds to ~60 bpm (200 samples/sec)
+  int minLag = sampleRate * 60 / 180; // Corresponds to ~400 bpm (30 samples/sec)
+  int maxLag = sampleRate * 60 / 40; // Corresponds to ~60 bpm (200 samples/sec)
+
+  // ensure lag=0 is skipped since it is the max
+  peakloc = minLag;
+  peak = autocorr[minLag];
+
   
   // loop to find the max lag and store as peakloc
   for (int lag = minLag; lag < maxLag && lag < samples; lag++) {
@@ -191,12 +193,28 @@ void loop() {
       }
   }
 
+  
+
+  Serial.print("Peak Lag: ");
+  Serial.println(peakloc);
 
   // Convert index of max value to HR (4 pts)
   // HR = beats per min
   // HR = 60 * beats/sec = 60 * freq
   // frequency = 1/period = 1/(num of samples / sample rate) = sample rate / peakloc
   myHR = 60.0 * sampleRate / peakloc;
+
+  // after finding the max peakloc
+  if (myHR > 180) {
+      // if result is unrealistically high, choose the next larger lag peak
+      for (int lag = peakloc + 1; lag < maxLag; lag++) {
+          if (autocorr[lag] > 0.8 * peak) { // still a strong peak
+              peakloc = lag;
+              break;
+          }
+      }
+      myHR = 60.0 * sampleRate / peakloc;
+  }
 
   // Calculate moving average HR (1 pt)
   sumHR -= HRBuff[j];  // remove previous sample
@@ -208,7 +226,6 @@ void loop() {
   myavgHR = sumHR / buffsize;  // update avgHR with new sample
 
   
-
 
     // Serial.print(spo2, DEC);
     // Serial.print("\t");
