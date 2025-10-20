@@ -1,5 +1,5 @@
-# BMEN6000E
-Signal processing for medical devices
+# Signal Processing for Medical Devices
+BMEN6000E - Fall 2025
 
 ### Lab 1 - Temperature monitoring
 This lab demonstrates an understanding of the **Wheatstone bridge circuit** by collecting real-time signal processing data using a _physiological (temperature) sensor_. By curve fitting the Steinhart-Hart equation, the measured resistance values are interpolated with known temperatures to calculate the calibration points, or Steinhart-Hart coefficients, in order to compute the temperature readings of the system. By evaluating all, 10-, and 100-time point intervals for the moving average at standard increments of temperature measured from the thermistor, the level of noise in the system can be observed to gauge the variability in hardware tolerances and data processing that ultimately influences the accuracy and precision of the results. 
