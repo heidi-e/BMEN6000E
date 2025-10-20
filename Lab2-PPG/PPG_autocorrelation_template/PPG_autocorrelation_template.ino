@@ -174,8 +174,6 @@ void loop() {
 
 
   // Find index of maximum value (3 pts)
-
-
   // start with min lag
   int minLag = sampleRate * 60 / 180; // Corresponds to ~400 bpm (30 samples/sec)
   int maxLag = sampleRate * 60 / 40; // Corresponds to ~60 bpm (200 samples/sec)
@@ -192,11 +190,6 @@ void loop() {
           peakloc = lag;
       }
   }
-
-  
-
-  Serial.print("Peak Lag: ");
-  Serial.println(peakloc);
 
   // Convert index of max value to HR (4 pts)
   // HR = beats per min

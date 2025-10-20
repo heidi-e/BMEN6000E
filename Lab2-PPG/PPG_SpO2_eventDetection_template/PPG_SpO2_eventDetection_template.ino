@@ -55,7 +55,7 @@ float diffIR[200];
 byte isPos = 0;
 byte prevPos = 0;
 float diffThresh = 50;  //CAN BE CHANGED
-float IRthresh = 220000;   //CAN BE CHANGED
+float IRthresh = 220000;   //CAN BE CHANGED220000
 int beatDetected = 0;
 unsigned long beatTime;
 unsigned long prevBeatTime = 0;
@@ -67,6 +67,7 @@ float sumHR = 0;
 float myavgHR;
 int j = 0;
 int numBeats = 0;
+int IBInumBeats = 0;
 
 
 // Variables to calculate HRV
@@ -77,7 +78,7 @@ float sumIBI = 0;
 float variance;
 float HRV;
 
-const int IBIbuffsize = 8;  //CAN BE CHANGED
+const int IBIbuffsize = 10;  //CAN BE CHANGED
 float IBIBuff[IBIbuffsize];
 int ibiIndex = 0;
 
@@ -159,7 +160,7 @@ void loop() {
       currIR = irBuffer[i];
       diffIR[i] = (currIR - prevIR);
 
-    
+      
       PPGSensor.nextSample(); //We're finished with this sample so move to next sample
 
       //For observation of the red signal, IR signal and the derivative or IR
@@ -223,13 +224,6 @@ void loop() {
     // false (0) --> slope is negative
     isPos = (diffIR[i] > diffThresh);  // true if slope is rising
     
-    // Serial.print(diffIR[i]);
-    // Serial.print("\t");
-    // Serial.print(isPos);
-    // Serial.println("\t");
-    // Serial.print(irBuffer[i]);
-    // Serial.print("\t");
-    // Serial.println(diffIR[i]);
 
     // peak detection 
     // find peak (zero crossing) slope crosses from pos to neg
@@ -238,37 +232,33 @@ void loop() {
         beatDetected++;
 
         // in milliseconds
-        
         //beatTime = i * (1000.0 / sampleRate);
         //beatTime = millis();
-        unsigned long now = micros() / 100000; // ms
+        unsigned long now = micros() / 1000; // ms
         
-        if (beatDetected > 1 && now - prevBeatTime > 250) {
+        // ensure beat is true heartbeat, avoids double detection of same heartbeat
+        if (beatDetected > 0 && now - prevBeatTime > 250) {
           unsigned long beatTime = now;
           timeBetweenBeats = beatTime - prevBeatTime;
-          //Serial.print("IBI = ");
-          //Serial.println(timeBetweenBeats);
-        //if (timeBetweenBeats > 100 && timeBetweenBeats < 2000) { 
-            // ignore out of range intervals (<30 bpm or >200 bpm)
-            myHR = 60000.0 / timeBetweenBeats; // bpm
-            //Serial.print("HR = ");
-            //Serial.println(myHR);
+          
+          myHR = 60000.0 / timeBetweenBeats; // bpm
+          
+          // define threshold of valid heart beats
+          if (myHR >= 40 && myHR <= 200){
 
             // Calculate moving average of HR (1 pt)
+            // compute moving average using number of samples actually collected
             sumHR -= HRBuff[j];  // remove previous sample
             HRBuff[j] = myHR;   // replace with new HR
             sumHR += HRBuff[j]; //compute sum of HR
-
             j++;
             if (j >= buffsize) {j = 0;}  //make sure the buffsize is not exceeded
+
             // only divide by the number of valid beats recorded so far
             if (numBeats < buffsize) numBeats++;
-            myavgHR = sumHR / numBeats;
-            //myavgHR = sumHR / buffsize;  // update avgHR with new sample
-            // compute moving average using number of samples actually collected
-            //int count = min(beatDetected, buffsize);  
-            //myavgHR = sumHR / count;
-
+            myavgHR = sumHR / numBeats;      
+            }
+            
 
             // Calculate HRV manually (5pts (BONUS))
             IBI = beatTime - prevBeatTime;   // ms between beats
@@ -279,9 +269,13 @@ void loop() {
             sumIBI += IBIBuff[ibiIndex]; //compute sum of IBI
 
             ibiIndex++;
-            if (ibiIndex >= IBIbuffsize) {ibiIndex = 0;}  //make sure the buffsize is not exceeded
-            IBIavg = sumIBI / IBIbuffsize;  // update avgIBI with new sample
-
+            // update avgIBI with new sample
+            if (ibiIndex >= IBIbuffsize) {
+              ibiIndex = 0;
+            IBIavg = sumIBI / IBIbuffsize;}  //make sure the buffsize is not exceeded
+            if (IBInumBeats < IBIbuffsize) {
+              IBInumBeats++;
+              IBIavg = sumIBI / IBInumBeats; }
 
 
             //HRV as SSN (squared standard deviation of IBI = variance)
@@ -291,12 +285,12 @@ void loop() {
             }
             variance = sumVar / IBIbuffsize;
             HRV = sqrt(variance);
-          //prevBeatTime = beatTime;  //can be moved to inside for loop above (300<timebeats<2000)
-       //}
+          prevBeatTime = beatTime;
 
         }
+        beatDetected++;
     }
-    prevBeatTime = beatTime;
+    //prevBeatTime = beatTime;
     
     }
     
