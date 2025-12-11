@@ -1,6 +1,5 @@
 # Signal Processing for Medical Devices
 BMEN6000E - Fall 2025
-Columbia University
 
 
 ## Lab 1 - Temperature monitoring
