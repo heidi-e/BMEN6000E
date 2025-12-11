@@ -1,0 +1,6 @@
+Diagnosis,Sensitivity,Specificity,Accuracy
+NORM,1.0,0.0,0.4381
+MI,0.0,1.0,0.7498
+CD,0.0,1.0,0.7743
+STTC,0.0,1.0,0.763
+HYP,0.0,1.0,0.8808
